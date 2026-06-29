@@ -30,29 +30,7 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
-const JWKS = createRemoteJWKSet(
-  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
-);
-const verifyToken = async (req, res, next) => {
-  const authHeaders = req.headers.authorization;
-  if (!authHeaders || !authHeaders.startsWith("Bearer")) {
-    return res.status(401).json({ msg: "Unauthorized" });
-  }
-  const token = authHeaders.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ msg: "Unauthorized" });
-  }
-  // console.log(token, "tokenssssss");
-  try {
-    const { payload } = await jwtVerify(token, JWKS);
-    req.user = payload;
-    // console.log(payload, "payload heresssssss");
-    next();
-  } catch (error) {
-    console.log(error);
-    return res.status(401).json({ msg: "Unauthorized" });
-  }
-};
+
 
 const verifySellerPro = async (req, res, next) => {
   const user = req.user;
@@ -70,6 +48,69 @@ async function run() {
     const lawyerData = db.collection("lawyerData");
     const hiringCollection = db.collection("hirings");
     const userCollection = db.collection("user");
+
+    // user profile update
+    app.get("/user/:email", async (req, res) => {
+      const email = req.params.email;
+
+      const result = await userCollection.findOne({ email });
+
+      res.send(result);
+    });
+    app.patch("/user/:email", async (req, res) => {
+      const email = req.params.email;
+
+      const { name, image } = req.body;
+
+      const result = await userCollection.updateOne(
+        { email },
+        {
+          $set: {
+            name,
+            image,
+          },
+        },
+      );
+
+      res.send(result);
+    });
+
+    // lawyer profile
+    app.get("/lawyer/:email", async (req, res) => {
+      const email = req.params.email;
+
+      const result = await lawyerData.findOne({ email });
+
+      res.send(result);
+    });
+    const { ObjectId } = require("mongodb");
+
+    app.patch("/lawyer/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const data = req.body;
+
+        console.log("id:", id);
+        console.log("data:", data);
+
+        // 🔥 REMOVE _id (MAIN FIX)
+        const { _id, ...rest } = data;
+
+        const result = await lawyerData.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: rest,
+          },
+        );
+
+        console.log(result, "result");
+
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({ message: "Update failed", error });
+      }
+    });
 
     // dashoboard
     app.get("/user", async (req, res) => {
@@ -97,6 +138,33 @@ async function run() {
       });
 
       res.send(result);
+    });
+    app.get("/analytics", async (req, res) => {
+      const totalUsers = await userCollection.countDocuments({
+        role: "user",
+      });
+
+      const totalLawyers = await userCollection.countDocuments({
+        role: "lawyer",
+      });
+
+      const totalHires = await hiringCollection.countDocuments();
+
+      const paidHires = await hiringCollection
+        .find({ paymentStatus: "paid" })
+        .toArray();
+
+      const totalRevenue = paidHires.reduce(
+        (sum, item) => sum + item.consultationFee,
+        0,
+      );
+
+      res.send({
+        totalUsers,
+        totalLawyers,
+        totalHires,
+        totalRevenue,
+      });
     });
 
     // payment
@@ -135,6 +203,13 @@ async function run() {
           message: error.message,
         });
       }
+    });
+    app.get("/transactions", async (req, res) => {
+      const result = await hiringCollection
+        .find({ paymentStatus: "paid" })
+        .toArray();
+
+      res.send(result);
     });
     app.patch("/hirings/payment/:id", async (req, res) => {
       const id = req.params.id;
