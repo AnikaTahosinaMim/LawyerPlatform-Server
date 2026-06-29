@@ -42,7 +42,7 @@ const verifySellerPro = async (req, res, next) => {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db("LawyerPlatform");
     const lawyerData = db.collection("lawyerData");
     const hiringCollection = db.collection("hirings");
@@ -250,6 +250,36 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+    app.get("/top-lawyers", async (req, res) => {
+      try {
+        const hires = await hiringCollection.find().toArray();
+
+        const hireCount = {};
+
+        hires.forEach((hire) => {
+          if (!hire.lawyerEmail) return;
+
+          hireCount[hire.lawyerEmail] = (hireCount[hire.lawyerEmail] || 0) + 1;
+        });
+
+        const lawyers = await lawyerData.find().toArray();
+
+        const topLawyers = lawyers
+          .map((lawyer) => ({
+            ...lawyer,
+            hires: hireCount[lawyer.email] || 0,
+          }))
+          .sort((a, b) => b.hires - a.hires)
+          .slice(0, 3);
+
+        res.send(topLawyers);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: "Something went wrong",
+        });
+      }
+    });
 
     // details pages
     app.get("/lawyerData/:id", async (req, res) => {
@@ -319,10 +349,10 @@ async function run() {
     });
     // payment
 
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!",
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!",
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
