@@ -5,7 +5,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const { createRemoteJWKSet, jwtVerify } = require("jose");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 dotenv.config();
 const uri = process.env.MONGODB_URI;
 
@@ -360,9 +360,9 @@ async function run() {
 }
 run().catch(console.dir);
 
-app.get("/", (req, res) => {
-  res.send("Server is running fine!");
-});
+// app.get("/", (req, res) => {
+//   res.send("Server is running fine!");
+// });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
