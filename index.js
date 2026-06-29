@@ -31,7 +31,6 @@ const client = new MongoClient(uri, {
   },
 });
 
-
 const verifySellerPro = async (req, res, next) => {
   const user = req.user;
   console.log(user, "user from seller");
@@ -226,14 +225,29 @@ async function run() {
       res.send(result);
     });
     app.get("/lawyerData", async (req, res) => {
+      const { search, specialization } = req.query;
       const limit = parseInt(req.query.limit);
 
-      let query = lawyerData.find();
+      let query = {};
+
+      if (search) {
+        query.name = {
+          $regex: search,
+          $options: "i",
+        };
+      }
+
+      if (specialization) {
+        query.specialization = specialization;
+      }
+
+      let cursor = lawyerData.find(query);
 
       if (limit) {
-        query = query.limit(limit);
+        cursor = cursor.limit(limit);
       }
-      const result = await query.toArray();
+
+      const result = await cursor.toArray();
       res.send(result);
     });
 
