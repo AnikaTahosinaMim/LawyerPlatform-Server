@@ -189,8 +189,8 @@ async function run() {
             },
           ],
 
-          success_url: `http://localhost:3000/payment-success?hiringId=${hiring._id}`,
-          cancel_url: `http://localhost:3000/dashboard/user/my-hiring`,
+          success_url: `https://lawyerplatformclient.vercel.app/payment-success?hiringId=${hiring._id}`,
+          cancel_url: `https://lawyerplatformclient.vercel.app/dashboard/user/my-hiring`,
         });
 
         res.send({
