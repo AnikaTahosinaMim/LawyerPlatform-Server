@@ -11,6 +11,9 @@ const uri = process.env.MONGODB_URI;
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const Stripe = require("stripe");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 app.use(
   cors({
@@ -66,40 +69,87 @@ async function run() {
     const db = client.db("LawyerPlatform");
     const lawyerData = db.collection("lawyerData");
     const hiringCollection = db.collection("hirings");
-    // const subscriptionCollection = db.collection("subscription");
-    // const userCOllection = db.collection("user");
-    // const productsCollection = db.collection("products");
+    const userCollection = db.collection("user");
 
-    // app.post("/subscription", async (req, res) => {
-    //   const { sessionId, userId, priceId } = req.body;
-    //   const isExist = await subscriptionCollection.findOne({ sessionId });
-    //   if (isExist) {
-    //     return res.json({ msg: "Already exist" });
-    //   }
-    //   await subscriptionCollection.insertOne({
-    //     sessionId,
-    //     userId,
-    //     priceId,
-    //   });
-    //   // update user role
-    //   await userCOllection.updateOne(
-    //     { _id: new ObjectId(userId) },
-    //     { $set: { plan: "pro" } },
-    //   );
-    //   res.send({ msg: "payment successfully!" });
-    // });
+    // dashoboard
+    app.get("/user", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+    app.patch("/user/role/:id", async (req, res) => {
+      const id = req.params.id;
+      const { role } = req.body;
 
-    // products
-    // app.post(
-    //   "/seller/products",
-    //   verifyToken,
-    //   verifySellerPro,
-    //   async (req, res) => {
-    //     const data = req.body;
-    //     const result = await productsCollection.insertOne({...data,userId:req.user.id});
-    //     res.send(result);
-    //   },
-    // );
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: { role },
+        },
+      );
+
+      res.send(result);
+    });
+    app.delete("/user/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await userCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+
+      res.send(result);
+    });
+
+    // payment
+    app.post("/create-checkout-session", async (req, res) => {
+      try {
+        const hiring = req.body;
+
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          mode: "payment",
+
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                unit_amount: hiring.consultationFee * 100,
+                product_data: {
+                  name: `Consultation with ${hiring.lawyerName}`,
+                },
+                unit_amount: hiring.consultationFee * 100, // Stripe amount in paisa
+              },
+              quantity: 1,
+            },
+          ],
+
+          success_url: `http://localhost:3000/payment-success?hiringId=${hiring._id}`,
+          cancel_url: `http://localhost:3000/dashboard/user/my-hiring`,
+        });
+
+        res.send({
+          url: session.url,
+        });
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({
+          message: error.message,
+        });
+      }
+    });
+    app.patch("/hirings/payment/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await hiringCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            paymentStatus: "paid",
+          },
+        },
+      );
+
+      res.send(result);
+    });
     app.get("/lawyerData", async (req, res) => {
       const limit = parseInt(req.query.limit);
 
@@ -178,6 +228,7 @@ async function run() {
 
       res.send(result);
     });
+    // payment
 
     await client.db("admin").command({ ping: 1 });
     console.log(
