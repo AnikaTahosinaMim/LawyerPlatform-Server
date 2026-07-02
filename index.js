@@ -15,12 +15,7 @@ const Stripe = require("stripe");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-app.use(
-  cors({
-    credentials: true,
-    origin: [process.env.CLIENT_URL],
-  }),
-);
+app.use(cors());
 app.use(express.json());
 
 const client = new MongoClient(uri, {
