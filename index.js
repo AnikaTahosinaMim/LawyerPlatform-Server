@@ -284,28 +284,52 @@ async function run() {
     });
 
     // hirings
+    // hirings
     app.post("/hirings", async (req, res) => {
-      const hiringData = req.body;
-      const exists = await hiringCollection.findOne({
-        lawyerId: hiringData.lawyerId,
-        userEmail: hiringData.userEmail,
-        status: "pending",
-      });
+      try {
+        console.log("========== HIRING API HIT ==========");
+        console.log("Request Body:", req.body);
 
-      if (exists) {
-        return res.status(400).send({
-          message: "You have already sent a hiring request.",
+        const hiringData = req.body;
+
+        if (!hiringData.lawyerId || !hiringData.userEmail) {
+          return res.status(400).send({
+            message: "Missing required fields.",
+          });
+        }
+
+        const exists = await hiringCollection.findOne({
+          lawyerId: hiringData.lawyerId,
+          userEmail: hiringData.userEmail,
+          status: "pending",
+        });
+
+        console.log("Existing Hiring:", exists);
+
+        if (exists) {
+          return res.status(400).send({
+            message: "You have already sent a hiring request.",
+          });
+        }
+
+        const result = await hiringCollection.insertOne({
+          ...hiringData,
+          status: "pending",
+          paymentStatus: "unpaid",
+          createdAt: new Date(),
+        });
+
+        console.log("Insert Result:", result);
+
+        res.send(result);
+      } catch (error) {
+        console.error("HIRING ERROR:", error);
+
+        res.status(500).send({
+          message: "Internal Server Error",
+          error: error.message,
         });
       }
-
-      const result = await hiringCollection.insertOne({
-        ...hiringData,
-        status: "pending",
-        paymentStatus: "unpaid",
-        createdAt: new Date(),
-      });
-
-      res.send(result);
     });
     app.get("/hirings/user/:email", async (req, res) => {
       const email = req.params.email;
